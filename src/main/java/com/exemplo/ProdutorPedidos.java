@@ -5,11 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-
 import com.rabbitmq.client.BuiltinExchangeType;
 
+import com.opencsv.CSVReader;
 
-import java.util.Scanner;
+import java.io.FileReader;
+import java.util.List;
 
 public class ProdutorPedidos {
     private static final String EXCHANGE = "pedidos_exchange";
@@ -20,29 +21,29 @@ public class ProdutorPedidos {
         factory.setHost("localhost");
 
         try (Connection connection = factory.newConnection(); Channel channel = connection.createChannel()) {
-            // Declara o exchange (direct)
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT);
 
-            Scanner scanner = new Scanner(System.in);
             ObjectMapper mapper = new ObjectMapper();
 
-            while (true) {
-                System.out.print("Digite o prato (ou 'sair'): ");
-                String prato = scanner.nextLine();
-                if (prato.equalsIgnoreCase("sair")) break;
+            // dentro da pasta
+            String arquivoCsv = "pedidos.csv";
 
-                System.out.print("Número da mesa: ");
-                int mesa = Integer.parseInt(scanner.nextLine());
+            try (CSVReader reader = new CSVReader(new FileReader(arquivoCsv))) {
+                List<String[]> linhas = reader.readAll();
 
-                System.out.print("Prioridade (normal/urgente): ");
-                String prioridade = scanner.nextLine();
+                
+                for (int i = 1; i < linhas.size(); i++) {
+                    String[] linha = linhas.get(i);
+                    String prato = linha[0];
+                    int mesa = Integer.parseInt(linha[1]);
+                    String prioridade = linha[2];
 
-                Pedido pedido = new Pedido(prato, mesa, prioridade);
-                String json = mapper.writeValueAsString(pedido);
+                    Pedido pedido = new Pedido(prato, mesa, prioridade);
+                    String json = mapper.writeValueAsString(pedido);
 
-                // Publica no exchange com chave de roteamento
-                channel.basicPublish(EXCHANGE, ROUTING_KEY, null, json.getBytes());
-                System.out.println("[x] Enviado: " + json);
+                    channel.basicPublish(EXCHANGE, ROUTING_KEY, null, json.getBytes());
+                    System.out.println("[x] Enviado: " + json);
+                }
             }
         }
     }
