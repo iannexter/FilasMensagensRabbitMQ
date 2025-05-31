@@ -23,15 +23,15 @@ public class ConsumidorPedidos {
         try (Connection connection = factory.newConnection();
              Channel channel = connection.createChannel()) {
 
-            // Declare exchanges duráveis
+            // exchanges duráveis
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT, true);
             channel.exchangeDeclare(DLX, BuiltinExchangeType.FANOUT, true);
 
-            // Declare fila DLQ (durável)
+            // fila DLQ (durável)
             channel.queueDeclare(DLQ, true, false, false, null);
             channel.queueBind(DLQ, DLX, "");
 
-            // Declare filas principais com DLX configurado e duráveis
+            //filas principais com DLX configurado e duráveis
             Map<String, Object> argsNormal = new HashMap<>();
             argsNormal.put("x-dead-letter-exchange", DLX);
             channel.queueDeclare(FILA_NORMAL, true, false, false, argsNormal);
