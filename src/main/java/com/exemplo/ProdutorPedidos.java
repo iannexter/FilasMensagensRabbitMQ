@@ -23,7 +23,7 @@ public class ProdutorPedidos {
 
             ObjectMapper mapper = new ObjectMapper();
 
-            // Leitura do CSV (ajuste caminho se necessário)
+            // Leitura do CSV
             try (BufferedReader br = new BufferedReader(new FileReader("pedidos.csv"))) {
                 String linha;
                 br.readLine(); // Pula cabeçalho
