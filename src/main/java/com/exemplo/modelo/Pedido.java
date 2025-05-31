@@ -13,9 +13,29 @@ public class Pedido {
         this.prioridade = prioridade;
     }
 
-    public String getPrato() { return prato; }
-    public int getMesa() { return mesa; }
-    public String getPrioridade() { return prioridade; }
+    public String getPrato() {
+        return prato;
+    }
+
+    public void setPrato(String prato) {
+        this.prato = prato;
+    }
+
+    public int getMesa() {
+        return mesa;
+    }
+
+    public void setMesa(int mesa) {
+        this.mesa = mesa;
+    }
+
+    public String getPrioridade() {
+        return prioridade;
+    }
+
+    public void setPrioridade(String prioridade) {
+        this.prioridade = prioridade;
+    }
 
     @Override
     public String toString() {

@@ -1,5 +1,5 @@
-prato,mesa,prioridade
 Pizza Margherita,12,normal
 Lasanha,5,urgente
 Risoto,8,normal
 Hambúrguer,3,urgente
+{ "prato": "Feijoada", "mesa": "nove" }

@@ -18,15 +18,15 @@ public class ProdutorPedidos {
         try (Connection connection = factory.newConnection();
              Channel channel = connection.createChannel()) {
 
-            // Exchange com durable=true
+            // Declara exchange durável
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT, true);
 
             ObjectMapper mapper = new ObjectMapper();
 
-            // Lê o arquivo CSV (ajuste o caminho se necessário)
+            // Leitura do CSV (ajuste caminho se necessário)
             try (BufferedReader br = new BufferedReader(new FileReader("pedidos.csv"))) {
                 String linha;
-                br.readLine(); // Pula o cabeçalho
+                br.readLine(); // Pula cabeçalho
 
                 while ((linha = br.readLine()) != null) {
                     String[] partes = linha.split(",");
@@ -38,15 +38,12 @@ public class ProdutorPedidos {
                         Pedido pedido = new Pedido(prato, mesa, prioridade);
                         String json = mapper.writeValueAsString(pedido);
 
-                        String routingKey;
-                        if ("urgente".equals(prioridade)) {
-                            routingKey = "pedidos.urgente";
-                        } else {
-                            routingKey = "pedidos.normal";
-                        }
+                        String routingKey = "normal".equals(prioridade) ? "pedidos.normal" : "pedidos.urgente";
 
                         channel.basicPublish(EXCHANGE, routingKey, null, json.getBytes(StandardCharsets.UTF_8));
                         System.out.printf("[x] Pedido enviado: %s (%s)%n", prato, prioridade);
+                    } else {
+                        System.err.println("[!] Linha do CSV ignorada (formato inválido): " + linha);
                     }
                 }
             }

@@ -4,7 +4,7 @@ import com.exemplo.modelo.Pedido;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.*;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,8 +14,7 @@ public class ConsumidorPedidos {
 
     private static final String FILA_NORMAL = "fila_pedidos_normal";
     private static final String FILA_URGENTE = "fila_pedidos_urgente";
-    private static final String DLQ_NORMAL = "dlq_pedidos_normal";
-    private static final String DLQ_URGENTE = "dlq_pedidos_urgente";
+    private static final String DLQ = "dlq_pedidos"; // Dead Letter Queue única para erros JSON
 
     public static void main(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
@@ -24,18 +23,15 @@ public class ConsumidorPedidos {
         try (Connection connection = factory.newConnection();
              Channel channel = connection.createChannel()) {
 
-            // Declara as exchanges com durable=true
+            // Declare exchanges duráveis
             channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT, true);
             channel.exchangeDeclare(DLX, BuiltinExchangeType.FANOUT, true);
 
-            // Declara DLQs como duráveis (durable=true)
-            channel.queueDeclare(DLQ_NORMAL, true, false, false, null);
-            channel.queueBind(DLQ_NORMAL, DLX, "");
+            // Declare fila DLQ (durável)
+            channel.queueDeclare(DLQ, true, false, false, null);
+            channel.queueBind(DLQ, DLX, "");
 
-            channel.queueDeclare(DLQ_URGENTE, true, false, false, null);
-            channel.queueBind(DLQ_URGENTE, DLX, "");
-
-            // Declara filas principais com DLX e durable=true
+            // Declare filas principais com DLX configurado e duráveis
             Map<String, Object> argsNormal = new HashMap<>();
             argsNormal.put("x-dead-letter-exchange", DLX);
             channel.queueDeclare(FILA_NORMAL, true, false, false, argsNormal);
@@ -53,7 +49,7 @@ public class ConsumidorPedidos {
             while (true) {
                 GetResponse urgenteMsg = channel.basicGet(FILA_URGENTE, false);
                 if (urgenteMsg != null) {
-                    String json = new String(urgenteMsg.getBody(), "UTF-8");
+                    String json = new String(urgenteMsg.getBody(), StandardCharsets.UTF_8);
                     try {
                         Pedido pedido = mapper.readValue(json, Pedido.class);
                         System.out.printf("[URGENTE] %s%n", pedido);
@@ -61,26 +57,28 @@ public class ConsumidorPedidos {
                         System.out.printf("[x] Pedido URGENTE '%s' concluído!%n", pedido.getPrato());
                         channel.basicAck(urgenteMsg.getEnvelope().getDeliveryTag(), false);
                     } catch (Exception e) {
-                        System.err.println("[!] Erro ao processar pedido urgente.");
+                        System.err.println("[!] JSON inválido no pedido urgente. Enviando para DLQ.");
+                        // Nack com requeue = false envia para DLX (DLQ)
                         channel.basicNack(urgenteMsg.getEnvelope().getDeliveryTag(), false, false);
                     }
-                } else {
-                    GetResponse normalMsg = channel.basicGet(FILA_NORMAL, false);
-                    if (normalMsg != null) {
-                        String json = new String(normalMsg.getBody(), "UTF-8");
-                        try {
-                            Pedido pedido = mapper.readValue(json, Pedido.class);
-                            System.out.printf("[NORMAL] %s%n", pedido);
-                            Thread.sleep(3000);
-                            System.out.printf("[x] Pedido NORMAL '%s' concluído!%n", pedido.getPrato());
-                            channel.basicAck(normalMsg.getEnvelope().getDeliveryTag(), false);
-                        } catch (Exception e) {
-                            System.err.println("[!] Erro ao processar pedido normal.");
-                            channel.basicNack(normalMsg.getEnvelope().getDeliveryTag(), false, false);
-                        }
-                    } else {
-                        Thread.sleep(500); // Aguarda um pouco antes de tentar novamente
+                    continue; // Para não consumir fila normal quando urgente tiver mensagem
+                }
+
+                GetResponse normalMsg = channel.basicGet(FILA_NORMAL, false);
+                if (normalMsg != null) {
+                    String json = new String(normalMsg.getBody(), StandardCharsets.UTF_8);
+                    try {
+                        Pedido pedido = mapper.readValue(json, Pedido.class);
+                        System.out.printf("[NORMAL] %s%n", pedido);
+                        Thread.sleep(3000);
+                        System.out.printf("[x] Pedido NORMAL '%s' concluído!%n", pedido.getPrato());
+                        channel.basicAck(normalMsg.getEnvelope().getDeliveryTag(), false);
+                    } catch (Exception e) {
+                        System.err.println("[!] JSON inválido no pedido normal. Enviando para DLQ.");
+                        channel.basicNack(normalMsg.getEnvelope().getDeliveryTag(), false, false);
                     }
+                } else {
+                    Thread.sleep(500); // Espera para não consumir CPU demais
                 }
             }
         }
