@@ -27,7 +27,7 @@ public class ConsumidorPedidos {
         // Declara o exchange principal (direct)
         channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT);
 
-        // Declara o exchange da DLQ (fanout para múltiplas filas, se necessário)
+        // Declara o exchange da DLQ
         channel.exchangeDeclare(DLX, BuiltinExchangeType.FANOUT);
 
         // Declara a fila de Dead Letter
@@ -44,7 +44,7 @@ public class ConsumidorPedidos {
         // Faz binding da fila principal ao exchange com a routing key
         channel.queueBind(FILA, EXCHANGE, ROUTING_KEY);
 
-        //channel.basicQos(1); // Para distribuição justa entre múltiplos consumidores
+        //channel.basicQos(1); // distribuir em muitos consumidores
 
         System.out.println("[*] Aguardando pedidos...");
 
