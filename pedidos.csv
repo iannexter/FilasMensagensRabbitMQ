@@ -1,6 +1,5 @@
 prato,mesa,prioridade
-Pizza,1,normal
-Hambúrguer,2,urgente
-Salada,3,normal
-Sushi,4,urgente
-Lasanha,5,normal
+Pizza Margherita,12,normal
+Lasanha,5,urgente
+Risoto,8,normal
+Hambúrguer,3,urgente

@@ -2,47 +2,52 @@ package com.exemplo;
 
 import com.exemplo.modelo.Pedido;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.BuiltinExchangeType;
+import com.rabbitmq.client.*;
 
-import com.opencsv.CSVReader;
-
+import java.io.BufferedReader;
 import java.io.FileReader;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 public class ProdutorPedidos {
     private static final String EXCHANGE = "pedidos_exchange";
-    private static final String ROUTING_KEY = "pedidos";
 
     public static void main(String[] args) throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
 
-        try (Connection connection = factory.newConnection(); Channel channel = connection.createChannel()) {
-            channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT);
+        try (Connection connection = factory.newConnection();
+             Channel channel = connection.createChannel()) {
+
+            // Exchange com durable=true
+            channel.exchangeDeclare(EXCHANGE, BuiltinExchangeType.DIRECT, true);
 
             ObjectMapper mapper = new ObjectMapper();
 
-            // dentro da pasta
-            String arquivoCsv = "pedidos.csv";
+            // Lê o arquivo CSV (ajuste o caminho se necessário)
+            try (BufferedReader br = new BufferedReader(new FileReader("pedidos.csv"))) {
+                String linha;
+                br.readLine(); // Pula o cabeçalho
 
-            try (CSVReader reader = new CSVReader(new FileReader(arquivoCsv))) {
-                List<String[]> linhas = reader.readAll();
+                while ((linha = br.readLine()) != null) {
+                    String[] partes = linha.split(",");
+                    if (partes.length == 3) {
+                        String prato = partes[0].trim();
+                        int mesa = Integer.parseInt(partes[1].trim());
+                        String prioridade = partes[2].trim().toLowerCase();
 
-                
-                for (int i = 1; i < linhas.size(); i++) {
-                    String[] linha = linhas.get(i);
-                    String prato = linha[0];
-                    int mesa = Integer.parseInt(linha[1]);
-                    String prioridade = linha[2];
+                        Pedido pedido = new Pedido(prato, mesa, prioridade);
+                        String json = mapper.writeValueAsString(pedido);
 
-                    Pedido pedido = new Pedido(prato, mesa, prioridade);
-                    String json = mapper.writeValueAsString(pedido);
+                        String routingKey;
+                        if ("urgente".equals(prioridade)) {
+                            routingKey = "pedidos.urgente";
+                        } else {
+                            routingKey = "pedidos.normal";
+                        }
 
-                    channel.basicPublish(EXCHANGE, ROUTING_KEY, null, json.getBytes());
-                    System.out.println("[x] Enviado: " + json);
+                        channel.basicPublish(EXCHANGE, routingKey, null, json.getBytes(StandardCharsets.UTF_8));
+                        System.out.printf("[x] Pedido enviado: %s (%s)%n", prato, prioridade);
+                    }
                 }
             }
         }
